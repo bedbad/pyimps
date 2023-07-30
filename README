@@ -1,0 +1,4 @@
+How it works:
+point script on a python file and see information of their imports in terminal:
+    python3 pyimports /path/to/file/to_analyze.py
+
