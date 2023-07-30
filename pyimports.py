@@ -47,6 +47,12 @@ class Node(Generic[T]):
         return outstr
     def print(self):
         print(self.outstr())
+
+    def get_root(self):
+        back = self
+        while back.parent is not None:
+            back = back.parent
+        return back
         
     def get_leafs(self):
         stack = [self]
@@ -144,10 +150,15 @@ if __name__ == '__main__':
     print('--Flats---')
     for tree in trees:
         l = tree.get_flat()
+        #print(l)
         for n in l:
             module_name = node_pathname(n)
             print(module_name)
-            
+            try:
+                print("Module found:", importlib.util.find_spec(n.value, n.get_root()))
+            except Exception as e:
+                print("module not found error "+str(e))
+                
     print("---Leafs---")
     for tree in trees:
         for leaf in tree.get_leafs():
