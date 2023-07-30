@@ -3,7 +3,10 @@ import ast
 import json
 
 from collections import deque
+
 import importlib.util
+import inspect
+
 from typing import TypeVar, Generic, List, Type
 
 
@@ -17,7 +20,7 @@ class Node(Generic[T]):
         child.set_parent = self
         self.children.add(child)
     def add_child_x(self, child)->bool:
-        if child in self.children:
+        if child not in self.children:
             self.add_child(child)
             return True
         return False
@@ -26,6 +29,7 @@ class Node(Generic[T]):
             self.add_child(child)
     def remove_child(self, child)->bool:
         if child in self.children:
+            child.set_parent(None)
             self.children.remove(child)
             return True
         return False
@@ -109,14 +113,15 @@ def get_imports(path):
                 for n in node.names:
                     namelist = n.name.split('.')
                     if len(namelist) > 1:
-                        for n in namelist:
-                            temp[n] = dict()
-                            temp = temp[n]
+                        for st in namelist:
+                            temp[st] = dict()
+                            temp = temp[st]
                     else:
                         temp[n.name] = dict()
             elif isinstance(node, ast.ImportFrom):
-                namelist = node.module.split('.')
                 temp = imports
+                #Import From node module node.module)
+                namelist = node.module.split('.')
                 for n in namelist:
                     temp[n] = dict()
                     temp = temp[n]
@@ -139,30 +144,39 @@ def traverse(tr : dict)->deque:
         
 
 if __name__ == '__main__':
-    imports = get_imports(sys.argv[1])
-    #print(json.dumps(imports, indent=4), '\n')
-    #for module in traverse(imports):
-    #    print('Module {} is found:{}'.format(module, (importlib.util.find_spec(module) is not None)))
+    imports = get_imports('../pyimptree/pyimptree.py')
+
     trees = dict2trees(imports)
+
     for tree in trees:
         tree.print()
-
-    print('--Flats---')
+    
+    final = dict()
     for tree in trees:
         l = tree.get_flat()
         #print(l)
         for n in l:
             module_name = node_pathname(n)
-            print(module_name)
-            try:
-                print("Module found:", importlib.util.find_spec(n.value, n.get_root()))
-            except Exception as e:
-                print("module not found error "+str(e))
-                
-    print("---Leafs---")
-    for tree in trees:
-        for leaf in tree.get_leafs():
-            print("Leaf name: "+leaf.outstr())
-            module_name = node_pathname(leaf)
-            print(str(leaf.value), module_name)
-        
+            if n.parent is not None:
+                parname = node_pathname(n.parent)
+                if sys.modules[parname]:
+                    parmod = sys.modules[parname]
+                    members = dict(inspect.getmembers(parmod, inspect.ismodule))
+                    if n.value in parmod.__all__:
+                        final[node_pathname(n)] = 'member'
+                    elif n.value in members.keys():
+                        final[node_pathname(n)] = 'submodule'
+                        importlib.import_module(node_pathname(n))
+            else:
+                try:
+                    importlib.import_module(module_name)
+                    final[module_name] = 'root'
+                except Exception as e:
+                    print("module error "+str(e))
+            if(final[module_name] is not None):
+                if final[module_name] == 'root':
+                    print("*"+module_name)
+                elif final[module_name] == 'member':
+                    print("+"+module_name)
+                elif final[module_name] == 'submodule':
+                    print("--"+module_name)
