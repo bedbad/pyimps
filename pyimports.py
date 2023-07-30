@@ -144,7 +144,7 @@ def traverse(tr : dict)->deque:
         
 
 if __name__ == '__main__':
-    imports = get_imports('../pyimptree/pyimptree.py')
+    imports = get_imports(sys.argv[1])
 
     trees = dict2trees(imports)
 
