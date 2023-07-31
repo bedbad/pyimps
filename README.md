@@ -3,7 +3,7 @@ point script on a python file and see information of their imports in terminal:
 
     python3 pyimports /path/to/file/to_analyze.py
 
-That wil achieve the following effect:
+That can achieve the following effect:
 ![Screenshot](Screenshot.png)
 
 Once upon a time I wanted get all import dependencies for a bunch of python files and to my surprize I found no
