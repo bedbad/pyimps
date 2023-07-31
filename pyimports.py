@@ -9,6 +9,15 @@ import inspect
 
 from typing import TypeVar, Generic, List, Type
 
+class bcs:
+    HEADER = '\033[95m'
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 T = TypeVar('T')
 class Node(Generic[T]):
@@ -87,7 +96,29 @@ def node_pathname(node: Node)->str:
         outstr = str(back.value) + '.' + outstr
         back = back.parent
     return outstr
-        
+
+def tree_outstr(root: Node[str], final:dict, indent=0)->None:
+    outstr = ''
+    if indent:
+        outstr += '\n' +(' '*indent) + '↑___'
+    name = node_pathname(root)
+    color = bcs.ENDC
+    if final[name] == 'member':
+        color = bcs.BLUE
+    elif final[name] == 'submodule':
+        color = bcs.GREEN
+    elif final[name] == 'root':
+        color = bcs.UNDERLINE
+    if(name in sys.modules):
+        outstr += color + str(root.value) + ' from ' + str(sys.modules[name].__spec__.origin) + bcs.ENDC
+    elif final[name]=='member':
+        outstr += color + str(root.value) +bcs.ENDC +'\n'
+    else:
+        pass
+    for child in root.children:
+        outstr += tree_outstr(child, final, indent+len(str(root.value)))
+    return outstr
+ 
 
 def dict2trees(dic : dict, back : Node[T] = None) -> List[Node[T]]:
     rootvals = dic.keys()
@@ -120,7 +151,6 @@ def get_imports(path):
                         temp[n.name] = dict()
             elif isinstance(node, ast.ImportFrom):
                 temp = imports
-                #Import From node module node.module)
                 namelist = node.module.split('.')
                 for n in namelist:
                     temp[n] = dict()
@@ -148,11 +178,12 @@ if __name__ == '__main__':
 
     trees = dict2trees(imports)
 
-    for tree in trees:
-        tree.print()
+    # for tree in trees:
+    #     tree.print()
     
-    final = dict()
+
     for tree in trees:
+        final = dict()
         l = tree.get_flat()
         #print(l)
         for n in l:
@@ -162,21 +193,22 @@ if __name__ == '__main__':
                 if sys.modules[parname]:
                     parmod = sys.modules[parname]
                     members = dict(inspect.getmembers(parmod, inspect.ismodule))
-                    if n.value in parmod.__all__:
-                        final[node_pathname(n)] = 'member'
-                    elif n.value in members.keys():
+                    if n.value in members.keys():
                         final[node_pathname(n)] = 'submodule'
                         importlib.import_module(node_pathname(n))
+                    elif n.value in parmod.__all__:
+                        final[node_pathname(n)] = 'member'
             else:
                 try:
                     importlib.import_module(module_name)
                     final[module_name] = 'root'
                 except Exception as e:
                     print("module error "+str(e))
-            if(final[module_name] is not None):
-                if final[module_name] == 'root':
-                    print("*"+module_name)
-                elif final[module_name] == 'member':
-                    print("+"+module_name)
-                elif final[module_name] == 'submodule':
-                    print("--"+module_name)
+        print(tree_outstr(tree, final))
+            # if(final[module_name] is not None):
+            #     if final[module_name] == 'root':
+            #         print("*"+module_name)
+            #     elif final[module_name] == 'member':
+            #         print("+"+module_name)
+            #     elif final[module_name] == 'submodule':
+            #         print("--"+module_name)
