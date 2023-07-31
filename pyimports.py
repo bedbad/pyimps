@@ -97,26 +97,22 @@ def node_pathname(node: Node)->str:
         back = back.parent
     return outstr
 
-def tree_outstr(root: Node[str], final:dict, indent=0)->None:
+def modtree_render(root: Node[str], final:dict, indent=0)->None:
     outstr = ''
     if indent:
         outstr += '\n' +(' '*indent) + '↑___'
     name = node_pathname(root)
     color = bcs.ENDC
-    if final[name] == 'member':
-        color = bcs.BLUE
-    elif final[name] == 'submodule':
-        color = bcs.GREEN
-    elif final[name] == 'root':
-        color = bcs.UNDERLINE
-    if(name in sys.modules):
-        outstr += color + str(root.value) + ' from ' + str(sys.modules[name].__spec__.origin) + bcs.ENDC
+    if(final[name] == 'root'):
+        outstr += bcs.WARNING + str(root.value) + bcs.ENDC + '<====' + str(sys.modules[name].__spec__.origin)
+    elif(final[name] == 'submodule'):
+        outstr += bcs.GREEN + str(root.value) + bcs.ENDC + '<====' + str(sys.modules[name].__spec__.origin) 
     elif final[name]=='member':
-        outstr += color + str(root.value) +bcs.ENDC +'\n'
-    else:
-        pass
+        outstr += bcs.BLUE + str(root.value) +bcs.ENDC
+    elif final[name]=='absent':
+        outstr += bcs.FAIL + str(root.value) +bcs.ENDC 
     for child in root.children:
-        outstr += tree_outstr(child, final, indent+len(str(root.value)))
+        outstr += modtree_render(child, final, indent+len(str(root.value)))
     return outstr
  
 
@@ -128,7 +124,7 @@ def dict2trees(dic : dict, back : Node[T] = None) -> List[Node[T]]:
         res.set_value(rootval)
         if back is not None:
             res.set_parent(back)
-        if dic[rootval]:
+        if rootval in dic:
             res.add_children(dict2trees(dic[rootval], res))
         reses.append(res)
     return reses
@@ -171,44 +167,81 @@ def traverse(tr : dict)->deque:
         if e[1]:
             stack.extend(list(e[1].items()))    
     return res
+
+def traverse(root : Node)->deque:
+    stack = [root]
+    res = deque()
+    while stack:
+        e = stack.pop()
+        res.append(e)
+        stack.extend(e.children)
+    return res
         
-
-if __name__ == '__main__':
-    imports = get_imports(sys.argv[1])
-
-    trees = dict2trees(imports)
-
-    # for tree in trees:
-    #     tree.print()
-    
-
-    for tree in trees:
-        final = dict()
-        l = tree.get_flat()
-        #print(l)
-        for n in l:
-            module_name = node_pathname(n)
+def tr2importtr(tree : Node)->None:
+    final = dict()
+    # l = tree.get_flat()
+    #print(l)
+    deq = traverse(tree)
+    while deq:
+        n = deq.popleft()
+        module_name = node_pathname(n)
+        try:
             if n.parent is not None:
                 parname = node_pathname(n.parent)
-                if sys.modules[parname]:
+                importlib.import_module(parname)
+                if parname in sys.modules:
                     parmod = sys.modules[parname]
                     members = dict(inspect.getmembers(parmod, inspect.ismodule))
                     if n.value in members.keys():
                         final[node_pathname(n)] = 'submodule'
-                        importlib.import_module(node_pathname(n))
                     elif n.value in parmod.__all__:
                         final[node_pathname(n)] = 'member'
             else:
-                try:
-                    importlib.import_module(module_name)
-                    final[module_name] = 'root'
-                except Exception as e:
-                    print("module error "+str(e))
-        print(tree_outstr(tree, final))
-            # if(final[module_name] is not None):
-            #     if final[module_name] == 'root':
-            #         print("*"+module_name)
-            #     elif final[module_name] == 'member':
-            #         print("+"+module_name)
-            #     elif final[module_name] == 'submodule':
-            #         print("--"+module_name)
+                importlib.import_module(module_name)
+                final[module_name] = 'root'
+        except Exception as e:
+                    final[module_name] = 'absent'
+                    # print("module error "+str(e))
+    return (tree, final)
+
+
+
+if __name__ == '__main__':
+    imports = get_imports(sys.argv[1])
+    trees = dict2trees(imports)
+    # for tree in trees:
+    #     tree.print()
+    for tree in trees:
+        tree, final = tr2importtr(tree)
+
+        print(modtree_render(tree, final))
+
+
+
+
+
+
+        # final = dict()
+        # # l = tree.get_flat()
+        # #print(l)
+        # deq = traverse(tree)
+        # while deq:
+        #     n = deq.popleft()
+        #     module_name = node_pathname(n)
+        #     try:
+        #         if n.parent is not None:
+        #             importlib.import_module(node_pathname(n))
+        #             parname = node_pathname(n.parent)
+        #             if parname in sys.modules:
+        #                 parmod = sys.modules[parname]
+        #                 members = dict(inspect.getmembers(parmod, inspect.ismodule))
+        #                 if n.value in members.keys():
+        #                     final[node_pathname(n)] = 'submodule'
+        #                 elif n.value in parmod.__all__:
+        #                     final[node_pathname(n)] = 'member'
+        #         else:
+        #             importlib.import_module(module_name)
+        #             final[module_name] = 'root'
+        #     except Exception as e:
+        #                 final[module_name] = 'absent'
+        #                 # print("module error "+str(e))
