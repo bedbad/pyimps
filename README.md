@@ -2,21 +2,21 @@ Give a python source to the script and get detailed imports tree in terminal imm
 
 ```
 
-python3 pyimports.py /opt/homebrew/lib/python3.11/site-packages/numpy/__init__.py
+python3 pyimports.py numpy                                                       
 sys<====built-in
 warnings<====/opt/homebrew/Cellar/python@3.11/3.11.4_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/warnings.py
 _globals
         ↑____CopyMode
         ↑____NoValue
 exceptions
+          ↑___VisibleDeprecationWarning
           ↑___ModuleDeprecationWarning
           ↑___TooHardError
-          ↑___ComplexWarning
-          ↑___VisibleDeprecationWarning
           ↑___AxisError
+          ↑___ComplexWarning
 version
-       ↑___git_revision
        ↑_____version__
+       ↑___git_revision
        
 ```
 
