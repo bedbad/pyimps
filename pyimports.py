@@ -1,4 +1,7 @@
 import sys
+from pathlib import Path
+import argparse
+
 import ast
 import json
 
@@ -7,7 +10,7 @@ from collections import deque
 import importlib.util
 import inspect
 
-from typing import TypeVar, Generic, List, Type
+from typing import TypeVar, Generic, List, Type, Dict
 
 class bcs:
     HEADER = '\033[95m'
@@ -115,7 +118,7 @@ def modtree_render(root: Node[str], final:dict, indent=0)->None:
         outstr += modtree_render(child, final, indent+len(str(root.value)))
     return outstr
  
-
+#transform a proper tree in a dict form into a tree form
 def dict2trees(dic : dict, back : Node[T] = None) -> List[Node[T]]:
     rootvals = dic.keys()
     reses = list()
@@ -124,35 +127,76 @@ def dict2trees(dic : dict, back : Node[T] = None) -> List[Node[T]]:
         res.set_value(rootval)
         if back is not None:
             res.set_parent(back)
-        if rootval in dic:
-            res.add_children(dict2trees(dic[rootval], res))
+        res.add_children(dict2trees(dic[rootval], res))
         reses.append(res)
     return reses
-        
 
-def get_imports(path):
+def get_import_trees(path):
+    if Path(path).name == '__init__.py':
+        pacname = Path(path).parent.name
+        return get_imports(path, pacname = pacname)
+    else:
+        return get_imports(path, pacname = None)
+
+def name2chain(name, separator = '.')->(Dict, Dict):
+    chain = dict()
+    rez = chain
+    namelist = name.split(separator)
+    for i in range(0, len(namelist) - 1):
+        chain[namelist[i]] = dict()
+        chain = chain[namelist[i]]
+    chain[namelist[-1]] = dict()
+    return rez
+
+
+def get_imports(path, pacname = None):
     imports = dict()
+    if pacname is not None:
+        imports[pacname] = dict()
     with open(path) as fh:
         root = ast.parse(fh.read(), path)
         for node in ast.iter_child_nodes(root):
             if isinstance(node, ast.Import):
-                temp = imports
+                temp = dict()
                 for n in node.names:
-                    namelist = n.name.split('.')
-                    if len(namelist) > 1:
-                        for st in namelist:
-                            temp[st] = dict()
-                            temp = temp[st]
-                    else:
-                        temp[n.name] = dict()
+                    temp = temp | name2chain(n.name)
+                imports = imports | temp
             elif isinstance(node, ast.ImportFrom):
-                temp = imports
-                namelist = node.module.split('.')
-                for n in namelist:
-                    temp[n] = dict()
-                    temp = temp[n]
-                for n in node.names:
-                    temp[n.name] = dict()
+                if node.module is None or node.level == 1:
+                    #relative imports from . ..
+                    if node.level > 1:
+                        #We don't support relative imports of higher levels
+                        raise Exception("relative import from parent folder or higher is ugly")
+                    assert pacname is not None
+                    temp = dict()
+                    if node.module is not None:
+                        temp = dict()
+                        for n in node.names:
+                            temp = temp | name2chain(n.name)
+                        chain = dict()
+                        rez = chain
+                        namelist = node.module.split('.')
+                        for i in range(0, len(namelist)-1):
+                            chain[namelist[i]] = dict()
+                            chain = chain[namelist[i]]
+                        chain[namelist[-1]] = temp
+                        imports[pacname] = imports[pacname] | rez
+                    else:
+                        temp = dict()
+                        for n in node.names:
+                            temp = temp | name2chain(n.name)
+                        imports[pacname] = imports[pacname] | temp
+                else:
+                    temp = dict()
+                    for n in node.names:
+                        temp = temp | name2chain(n.name)
+                    chain = dict()
+                    namelist = node.module.split('.')
+                    for i in range(0, len(namelist)):
+                        chain[namelist[i]] = dict()
+                        chain = chain[namelist[i]]
+                    chain[namelist[-1]] = temp
+                    imports = imports | chain
             else:
                 continue
     return imports
@@ -165,7 +209,7 @@ def traverse(tr : dict)->deque:
         print(e)
         res.append(e[0])
         if e[1]:
-            stack.extend(list(e[1].items()))    
+            stack.extend(list(e[1].items()))
     return res
 
 def traverse(root : Node)->deque:
@@ -194,12 +238,16 @@ def tr2importtr(tree : Node)->None:
                     members = dict(inspect.getmembers(parmod, inspect.ismodule))
                     if n.value in members.keys():
                         final[node_pathname(n)] = 'submodule'
-                    elif n.value in parmod.__all__:
+                    elif hasattr(parmod, '__all__') and n.value in parmod.__all__:
                         final[node_pathname(n)] = 'member'
+                    else:
+                        final[node_pathname(n)] = 'absent'
             else:
                 importlib.import_module(module_name)
                 final[module_name] = 'root'
         except Exception as e:
+                    print(e)
+                    print('sys path:', sys.path)
                     final[module_name] = 'absent'
                     # print("module error "+str(e))
     return (tree, final)
@@ -207,41 +255,50 @@ def tr2importtr(tree : Node)->None:
 
 
 if __name__ == '__main__':
-    imports = get_imports(sys.argv[1])
+    parser = argparse.ArgumentParser(description = 'Pyimports shows dependency tree of python source files and modules')
+    parser.add_argument('py_src', type=str, help = 'python source file to analyze')
+    args = parser.parse_args()
+    if args.py_src.endswith('.py'):
+        src = args.py_src
+    else:
+        #we got a module
+        try:
+            mod2inspect = importlib.import_module(args.py_src)
+            src = mod2inspect.__file__
+            print('Full path: ' + src) 
+        except Exception as e:
+            print(args.py_src + ' is not found in importable modules')
+            print(e)
+            sys.exit(1)
+        
+            
+    imports = get_import_trees(src)
     trees = dict2trees(imports)
-    # for tree in trees:
-    #     tree.print()
     for tree in trees:
         tree, final = tr2importtr(tree)
-
+ 
         print(modtree_render(tree, final))
-
-
-
-
-
-
-        # final = dict()
-        # # l = tree.get_flat()
-        # #print(l)
-        # deq = traverse(tree)
-        # while deq:
-        #     n = deq.popleft()
-        #     module_name = node_pathname(n)
-        #     try:
-        #         if n.parent is not None:
-        #             importlib.import_module(node_pathname(n))
-        #             parname = node_pathname(n.parent)
-        #             if parname in sys.modules:
-        #                 parmod = sys.modules[parname]
-        #                 members = dict(inspect.getmembers(parmod, inspect.ismodule))
-        #                 if n.value in members.keys():
-        #                     final[node_pathname(n)] = 'submodule'
-        #                 elif n.value in parmod.__all__:
-        #                     final[node_pathname(n)] = 'member'
-        #         else:
-        #             importlib.import_module(module_name)
-        #             final[module_name] = 'root'
-        #     except Exception as e:
-        #                 final[module_name] = 'absent'
-        #                 # print("module error "+str(e))
+    # final = dict()
+    # # l = tree.get_flat()
+    # #print(l)
+    # deq = traverse(tree)
+    # while deq:
+    #     n = deq.popleft()
+    #     module_name = node_pathname(n)
+    #     try:
+    #         if n.parent is not None:
+    #             importlib.import_module(node_pathname(n))
+    #             parname = node_pathname(n.parent)
+    #             if parname in sys.modules:
+    #                 parmod = sys.modules[parname]
+    #                 members = dict(inspect.getmembers(parmod, inspect.ismodule))
+    #                 if n.value in members.keys():
+    #                     final[node_pathname(n)] = 'submodule'
+    #                 elif n.value in parmod.__all__:
+    #                     final[node_pathname(n)] = 'member'
+    #         else:
+    #             importlib.import_module(module_name)
+    #             final[module_name] = 'root'
+    #     except Exception as e:
+    #                 final[module_name] = 'absent'
+    #                 # print("module error "+str(e))
