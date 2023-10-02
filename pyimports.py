@@ -13,11 +13,13 @@ import inspect
 from typing import TypeVar, Generic, List, Type, Dict
 
 class bcs:
-    HEADER = '\033[95m'
+    TEAL = '\033[96m'
+    PINK = '\033[95m'
     BLUE = '\033[94m'
     GREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    GRAY = '\033[90m'
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
@@ -107,13 +109,24 @@ def modtree_render(root: Node[str], final:dict, indent=0)->None:
     name = node_pathname(root)
     color = bcs.ENDC
     if(final[name] == 'root'):
-        outstr += bcs.WARNING + str(root.value) + bcs.ENDC + '<====' + str(sys.modules[name].__spec__.origin)
+        outstr += bcs.YELLOW + str(root.value) + bcs.ENDC + '<====' + str(sys.modules[name].__spec__.origin)
     elif(final[name] == 'submodule'):
         outstr += bcs.GREEN + str(root.value) + bcs.ENDC + '<====' + str(sys.modules[name].__spec__.origin) 
-    elif final[name]=='member':
+    elif(final[name] == 'irregular_module'):
+        outstr += bcs.PINK + str(root.value) + bcs.ENDC #
+    elif(final[name] == 'deleted_module'):
+        outstr += bcs.PINK + str(root.value) + '(deleted)' + bcs.ENDC #
+    elif(final[name] == 'ALL'):
+        realname = name[:-2]
+        outstr +=   '('+bcs.GRAY+','.join([str(item) for item in sys.modules[realname].__all__]) +bcs.ENDC+')' #
+    elif final[name]=='class':
         outstr += bcs.BLUE + str(root.value) +bcs.ENDC
+    elif final[name]=='variable':
+        outstr += bcs.GRAY + str(root.value) +bcs.ENDC
+    elif final[name]=='function':
+        outstr += bcs.TEAL + str(root.value) +bcs.ENDC
     elif final[name]=='absent':
-        outstr += bcs.FAIL + str(root.value) +bcs.ENDC 
+        outstr += bcs.RED + str(root.value) +bcs.ENDC 
     for child in root.children:
         outstr += modtree_render(child, final, indent+len(str(root.value)))
     return outstr
@@ -148,6 +161,19 @@ def name2chain(name, separator = '.')->(Dict, Dict):
     chain[namelist[-1]] = dict()
     return rez
 
+def merge_tdics(map1 : dict, map2 : dict)->dict:
+    xset = set.intersection(set(map1.keys()), set(map2.keys()))
+    dset1 = set(map1.keys()) -  set(map2.keys())
+    dset2 = set(map2.keys()) - set(map1.keys())
+    rez = dict()
+    for k in dset1:
+        rez[k] = map1[k]
+    for k in dset2:
+        rez[k] = map2[k]
+    for k in xset:
+        rez[k] = merge_tdics(map1[k], map2[k])
+    return rez
+
 
 def get_imports(path, pacname = None):
     imports = dict()
@@ -159,8 +185,8 @@ def get_imports(path, pacname = None):
             if isinstance(node, ast.Import):
                 temp = dict()
                 for n in node.names:
-                    temp = temp | name2chain(n.name)
-                imports = imports | temp
+                    temp = merge_tdics(temp,name2chain(n.name))
+                imports = merge_tdics(imports, temp)
             elif isinstance(node, ast.ImportFrom):
                 if node.module is None or node.level == 1:
                     #relative imports from . ..
@@ -172,7 +198,7 @@ def get_imports(path, pacname = None):
                     if node.module is not None:
                         temp = dict()
                         for n in node.names:
-                            temp = temp | name2chain(n.name)
+                            temp = merge_tdics(temp,name2chain(n.name))
                         chain = dict()
                         rez = chain
                         namelist = node.module.split('.')
@@ -180,23 +206,24 @@ def get_imports(path, pacname = None):
                             chain[namelist[i]] = dict()
                             chain = chain[namelist[i]]
                         chain[namelist[-1]] = temp
-                        imports[pacname] = imports[pacname] | rez
+                        imports[pacname] = merge_tdics(imports[pacname],rez)
                     else:
                         temp = dict()
                         for n in node.names:
-                            temp = temp | name2chain(n.name)
-                        imports[pacname] = imports[pacname] | temp
+                            temp = merge_tdics(temp,name2chain(n.name))
+                        imports[pacname] = merge_tdics(imports[pacname],temp)
                 else:
                     temp = dict()
                     for n in node.names:
-                        temp = temp | name2chain(n.name)
+                        temp = merge_tdics(temp,name2chain(n.name))
                     chain = dict()
+                    rez = chain
                     namelist = node.module.split('.')
-                    for i in range(0, len(namelist)):
+                    for i in range(0, len(namelist)-1):
                         chain[namelist[i]] = dict()
                         chain = chain[namelist[i]]
                     chain[namelist[-1]] = temp
-                    imports = imports | chain
+                    imports = merge_tdics(imports,rez)
             else:
                 continue
     return imports
@@ -235,13 +262,28 @@ def tr2importtr(tree : Node)->None:
                 importlib.import_module(parname)
                 if parname in sys.modules:
                     parmod = sys.modules[parname]
-                    members = dict(inspect.getmembers(parmod, inspect.ismodule))
-                    if n.value in members.keys():
-                        final[node_pathname(n)] = 'submodule'
-                    elif hasattr(parmod, '__all__') and n.value in parmod.__all__:
-                        final[node_pathname(n)] = 'member'
+                    member_modules = dict(inspect.getmembers(parmod, inspect.ismodule))
+                    member_classes = dict(inspect.getmembers(parmod, inspect.isclass))
+                    member_functions = dict(inspect.getmembers(parmod, inspect.isfunction))
+                    if n.value in member_modules.keys():
+                        mod = member_modules[n.value]
+                        if mod.__spec__ is not None:
+                            importlib.import_module(mod.__name__, parmod)
+                            final[node_pathname(n)] = 'submodule'
+                        else:
+                            final[node_pathname(n)] = 'irregular_module'
+                    elif n.value in member_classes.keys():
+                        final[node_pathname(n)] = 'class'
+                    elif n.value in member_functions.keys():
+                        final[node_pathname(n)] = 'function'
+                    elif n.value in dir(parmod):
+                        final[node_pathname(n)] = 'variable'
                     else:
-                        final[node_pathname(n)] = 'absent'
+                        if module_name.endswith('.*'):
+                            final[node_pathname(n)] = 'ALL'
+                        else:
+                            importlib.import_module(module_name)
+                            final[node_pathname(n)] = 'deleted_module'
             else:
                 importlib.import_module(module_name)
                 final[module_name] = 'root'
