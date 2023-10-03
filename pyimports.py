@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import os
 import argparse
 
 import ast
@@ -9,6 +10,8 @@ from collections import deque
 
 import importlib.util
 import inspect
+
+import pkgutil
 
 from typing import TypeVar, Generic, List, Type, Dict
 
@@ -118,7 +121,10 @@ def modtree_render(root: Node[str], final:dict, indent=0)->None:
         outstr += bcs.PINK + str(root.value) + '(deleted)' + bcs.ENDC #
     elif(final[name] == 'ALL'):
         realname = name[:-2]
-        outstr +=   '('+bcs.GRAY+','.join([str(item) for item in sys.modules[realname].__all__]) +bcs.ENDC+')' #
+        if(hasattr(sys.modules[realname], '__all__')):
+            outstr +=   '('+bcs.GRAY+','.join([str(item) for item in sys.modules[realname].__all__]) +bcs.ENDC+')' #
+        else:
+            outstr +=   '('+bcs.GRAY+','.join([name for _, name, _ in pkgutil.iter_modules([sys.modules[realname].__file__])]) +bcs.ENDC+')' #
     elif final[name]=='class':
         outstr += bcs.BLUE + str(root.value) +bcs.ENDC
     elif final[name]=='variable':
@@ -144,10 +150,17 @@ def dict2trees(dic : dict, back : Node[T] = None) -> List[Node[T]]:
         reses.append(res)
     return reses
 
+def path2package_name(path)->str:
+        start_dir = Path(path).parent
+        while start_dir.joinpath('__init__.py').exists():
+            start_dir = start_dir.parent
+        relpath = Path(path).parent.relative_to(start_dir)
+        pacname = '.'.join(relpath.parts)
+        return pacname
+
 def get_import_trees(path):
     if Path(path).name == '__init__.py':
-        pacname = Path(path).parent.name
-        return get_imports(path, pacname = pacname)
+        return get_imports(path, pacname=path2package_name(path))
     else:
         return get_imports(path, pacname = None)
 
