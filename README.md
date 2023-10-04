@@ -6,7 +6,7 @@ python3 pyimports.py torch
 ```
 ![Screenshot](Screenshot.png)
 
-Each dependency colored differently depending on whether it exists, is a package and is a final transitive dependency(leaf)
+Each dependency colored differently depending on whether it exists, depending on it's type
 
 I wanted get all import dependencies for a bunch of python files and to my surprize I found no
 simple tool in Python that could it, pydeps is too hefty and more importantly is not a shell utility.
