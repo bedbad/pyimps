@@ -1,24 +1,10 @@
 Give a python source to the script and get detailed imports tree in terminal immideately:
 
+A complicated project like torch will give somthing like this
 ```
-
-python3 pyimports.py numpy                                                       
-sys<====built-in
-warnings<====/opt/homebrew/Cellar/python@3.11/3.11.4_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/warnings.py
-_globals
-        ↑____CopyMode
-        ↑____NoValue
-exceptions
-          ↑___VisibleDeprecationWarning
-          ↑___ModuleDeprecationWarning
-          ↑___TooHardError
-          ↑___AxisError
-          ↑___ComplexWarning
-version
-       ↑_____version__
-       ↑___git_revision
-       
+python3 pyimports.py torch                                                       
 ```
+![Screenshot](Screenshot.png)
 
 Each dependency colored differently depending on whether it exists, is a package and is a final transitive dependency(leaf)
 
