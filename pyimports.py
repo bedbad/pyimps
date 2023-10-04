@@ -359,27 +359,3 @@ if __name__ == '__main__':
         tree, final = tr2importtr(tree)
  
         print(modtree_render(tree, final))
-    # final = dict()
-    # # l = tree.get_flat()
-    # #print(l)
-    # deq = traverse(tree)
-    # while deq:
-    #     n = deq.popleft()
-    #     module_name = node_pathname(n)
-    #     try:
-    #         if n.parent is not None:
-    #             importlib.import_module(node_pathname(n))
-    #             parname = node_pathname(n.parent)
-    #             if parname in sys.modules:
-    #                 parmod = sys.modules[parname]
-    #                 members = dict(inspect.getmembers(parmod, inspect.ismodule))
-    #                 if n.value in members.keys():
-    #                     final[node_pathname(n)] = 'submodule'
-    #                 elif n.value in parmod.__all__:
-    #                     final[node_pathname(n)] = 'member'
-    #         else:
-    #             importlib.import_module(module_name)
-    #             final[module_name] = 'root'
-    #     except Exception as e:
-    #                 final[module_name] = 'absent'
-    #                 # print("module error "+str(e))
