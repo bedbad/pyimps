@@ -6,6 +6,8 @@ import argparse
 import ast
 import json
 
+import requests
+
 from collections import deque
 
 import importlib.util
@@ -124,7 +126,10 @@ def modtree_render(root: Node[str], final:dict, indent=0)->None:
         if(hasattr(sys.modules[realname], '__all__')):
             outstr +=   '('+bcs.GRAY+','.join([str(item) for item in sys.modules[realname].__all__]) +bcs.ENDC+')' #
         else:
-            outstr +=   '('+bcs.GRAY+','.join([name for _, name, _ in pkgutil.iter_modules([sys.modules[realname].__file__])]) +bcs.ENDC+')' #
+            mod  = sys.modules[realname]
+            members = inspect.getmembers(mod, lambda m: inspect.isclass(m) or inspect.isfunction(m) or inspect.ismodule(m))
+            path= mod.__file__
+            outstr +=   '('+bcs.GRAY+','.join([str(member[0]) for member in members]) +bcs.ENDC+')' #
     elif final[name]=='class':
         outstr += bcs.BLUE + str(root.value) +bcs.ENDC
     elif final[name]=='variable':
@@ -308,11 +313,32 @@ def tr2importtr(tree : Node)->None:
     return (tree, final)
 
 
+def exec_search(modsstr : str):
+    api_url = "https://pypi.org/search/"
+    page_size = 2
+    sort_by = "name"
+    date_format = "%d-%-m-%Y"
+    link_defualt_format = "https://pypi.org/project/{package.name}"
+
+    s = requests.Session()
+    for page in range(3):
+        params = {"q": modsstr, "page": page}
+        r = s.get(api_url, params=params)
+        print(r.text)
+
+    return r.text
+
+
+
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Pyimports shows dependency tree of python source files and modules')
+    parser.add_argument('-s', '--search', required=False, help='search for specified module on registry', action='store_true', default=False)
     parser.add_argument('py_src', type=str, help = 'python source file to analyze')
     args = parser.parse_args()
+    if args.search:
+        exec_search(args.py_src.split('.')[0])
     if args.py_src.endswith('.py'):
         src = args.py_src
     else:
@@ -320,7 +346,7 @@ if __name__ == '__main__':
         try:
             mod2inspect = importlib.import_module(args.py_src)
             src = mod2inspect.__file__
-            print('Full path: ' + src) 
+            print('Module path: ' + src) 
         except Exception as e:
             print(args.py_src + ' is not found in importable modules')
             print(e)
