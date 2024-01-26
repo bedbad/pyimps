@@ -12,7 +12,7 @@ pip install pyimps
 ## Usage
 A complex project like torch will give something like this
 ```
-pyimps torch                                                       
+pyimps tensorflow                                                  
 ```
 ![Screenshot](resources/Screenshot.png)
 
