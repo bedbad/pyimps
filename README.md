@@ -14,7 +14,7 @@ A complex project like torch will give something like this
 ```
 pyimps torch                                                       
 ```
-![Screenshot](Screenshot.png)
+![Screenshot](resources/Screenshot.png)
 
 
 
