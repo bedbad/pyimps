@@ -329,10 +329,7 @@ def exec_search(modsstr : str):
     return r.text
 
 
-
-
-
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description = 'Pyimports shows dependency tree of python source files and modules')
     parser.add_argument('-s', '--search', required=False, help='search for specified module on registry', action='store_true', default=False)
     parser.add_argument('py_src', type=str, help = 'python source file to analyze')
@@ -359,3 +356,7 @@ if __name__ == '__main__':
         tree, final = tr2importtr(tree)
  
         print(modtree_render(tree, final))
+
+
+if __name__ == '__main__':
+   main()
