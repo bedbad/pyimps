@@ -4,7 +4,7 @@ If any dependency may present an issue(reloaded module, frozen, or module define
 
 A complex project like torch will give something like this
 ```
-python3 pyimports.py torch                                                       
+pyimps torch                                                       
 ```
 ![Screenshot](Screenshot.png)
 
