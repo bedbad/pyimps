@@ -1,3 +1,5 @@
 .venv/
+dist/
+*.egg-info
 .vscode/launch.json
 .DS_Store
