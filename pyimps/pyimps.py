@@ -107,39 +107,47 @@ def node_pathname(node: Node)->str:
         back = back.parent
     return outstr
 
-def modtree_render(root: Node[str], final:dict, indent=0)->None:
+def modtree_render(root: Node[str], final:dict, indent=0, detail = False)->None:
     outstr = ''
     if indent:
         outstr += '\n' +(' '*indent) + '↑___'
     name = node_pathname(root)
     color = bcs.ENDC
+    add_detail = ''
+    if detail:
+        if final[name] in {'submodule', 'irregular_module', 'deleted_module','variable,','ALL', 'absent', 'function'}:
+            add_detail = ("({})".format(final[name][:3])).upper()
+        else:
+            add_detail = ("({})".format(final[name])).upper()
+    
+    render_name =  str(root.value) + add_detail
     if(final[name] == 'root'):
-        outstr += bcs.YELLOW + str(root.value) + bcs.ENDC + '<====' + str(sys.modules[name].__spec__.origin)
+        outstr += bcs.YELLOW + render_name + bcs.ENDC + '<====' + str(sys.modules[name].__spec__.origin)
     elif(final[name] == 'submodule'):
-        outstr += bcs.GREEN + str(root.value) + bcs.ENDC + '<====' + str(sys.modules[name].__spec__.origin) 
+        outstr += bcs.GREEN + render_name + bcs.ENDC + '<====' + str(sys.modules[name].__spec__.origin) 
     elif(final[name] == 'irregular_module'):
-        outstr += bcs.PINK + str(root.value) + bcs.ENDC #
+        outstr += bcs.PINK +render_name + bcs.ENDC #
     elif(final[name] == 'deleted_module'):
-        outstr += bcs.PINK + str(root.value) + '(deleted)' + bcs.ENDC #
+        outstr += bcs.PINK + render_name + '(deleted)' + bcs.ENDC #
     elif(final[name] == 'ALL'):
         realname = name[:-2]
         if(hasattr(sys.modules[realname], '__all__')):
-            outstr +=   '('+bcs.GRAY+','.join([str(item) for item in sys.modules[realname].__all__]) +bcs.ENDC+')' #
+            outstr +=   '('+bcs.GRAY+','.join([str(item) for item in sys.modules[realname].__all__]) + add_detail +bcs.ENDC+')' #
         else:
             mod  = sys.modules[realname]
             members = inspect.getmembers(mod, lambda m: inspect.isclass(m) or inspect.isfunction(m) or inspect.ismodule(m))
             path= mod.__file__
-            outstr +=   '('+bcs.GRAY+','.join([str(member[0]) for member in members]) +bcs.ENDC+')' #
+            outstr +=   '('+bcs.GRAY+','.join([str(member[0]) for member in members]) + add_detail +bcs.ENDC+')' #
     elif final[name]=='class':
-        outstr += bcs.BLUE + str(root.value) +bcs.ENDC
+        outstr += bcs.BLUE + render_name +bcs.ENDC
     elif final[name]=='variable':
-        outstr += bcs.GRAY + str(root.value) +bcs.ENDC
+        outstr += bcs.GRAY + render_name +bcs.ENDC
     elif final[name]=='function':
-        outstr += bcs.TEAL + str(root.value) +bcs.ENDC
+        outstr += bcs.TEAL + render_name +bcs.ENDC
     elif final[name]=='absent':
-        outstr += bcs.RED + str(root.value) +bcs.ENDC 
+        outstr += bcs.RED + render_name +bcs.ENDC 
     for child in root.children:
-        outstr += modtree_render(child, final, indent+len(str(root.value)))
+        outstr += modtree_render(child, final, indent+len(str(root.value)), detail=detail)
     return outstr
  
 #transform a proper tree in a dict form into a tree form
@@ -329,11 +337,29 @@ def exec_search(modsstr : str):
     return r.text
 
 
+color_coding_description = (
+    "\nCOLOR CODING\n"
+    "- {} for absent modules\n".format(bcs.RED + 'RED' + bcs.ENDC)+
+    "- {} for root nodes\n".format(bcs.YELLOW + 'YELLOW' + bcs.ENDC)+
+    "- {} for submodule nodes\n".format(bcs.GREEN + 'GREEN' + bcs.ENDC)+
+    "- {} for irregular/ module nodes\n".format(bcs.PINK + 'PINK' + bcs.ENDC)+
+    "- {} with(deleted) for deleted\n".format(bcs.PINK + 'PINK' + bcs.ENDC)+
+    "- {} for class nodes\n".format(bcs.BLUE + 'BLUE' + bcs.ENDC)+
+    "- {} for function\n".format(bcs.TEAL + 'TEAL' + bcs.ENDC)+
+    "- {} for variable, other import * misc\n".format(bcs.GRAY + 'GRAY' + bcs.ENDC)
+)
+top_description = (
+    "Pyimports shows dependency tree of python source files and modules\r\n"
+)
+full_description = top_description + color_coding_description
+
 def main():
-    parser = argparse.ArgumentParser(description = 'Pyimports shows dependency tree of python source files and modules')
-    parser.add_argument('-s', '--search', required=False, help='search for specified module on registry', action='store_true', default=False)
-    parser.add_argument('py_src', type=str, help = 'python source file to analyze')
+    parser = argparse.ArgumentParser(description = full_description, formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('-s', '--search', required=False, action='store_true', default=False, help='TODO:search for specified module on PYPI registry')
+    parser.add_argument('-v', '--verbose',required=False, action='store_true', default=False, help='indicate details like type of import')
+    parser.add_argument('py_src', type=str, help = 'python source path(with .py) or module name(without .py)')
     args = parser.parse_args()
+    verbose = args.verbose
     if args.search:
         exec_search(args.py_src.split('.')[0])
     if args.py_src.endswith('.py'):
@@ -355,7 +381,7 @@ def main():
     for tree in trees:
         tree, final = tr2importtr(tree)
  
-        print(modtree_render(tree, final))
+        print(modtree_render(tree, final, detail=verbose))
 
 
 if __name__ == '__main__':
