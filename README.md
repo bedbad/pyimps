@@ -10,7 +10,9 @@ pip install pyimps
 ```
 
 ## Usage
-A complex project like torch will give something like this
+Use it on a) source.py file b) any module name (main.suba.subb) in sys.path and current path
+
+A complex project like tensorflow will give something like this
 ```
 pyimps tensorflow                                                  
 ```
