@@ -23,4 +23,4 @@ pyimps tensorflow
 I wanted to check and control dependencies for large python codebase to bundled into an application and to my surprize I found no simple tool in Python that could it, pydeps is too hefty and more importantly it does not output to terminal, you need to do extra steps to open the graph in a separate graph reader gui.
 
 On the bigger level the wish was to automate and hermetisize python builds completely, make it possible to forget about package env managers and any things at all that lay outside the project folder, including the interpreter - integrate it seamlesly with other languages in monorepo, which ![bazelbuild/rules_python](https://github.com/bazelbuild/rules_python) started to do.
-That will allow remote building and cross-building of python apps easily including baking any docker images - a lot of work ahead of someone 
+That will allow remote building and cross-building of python apps easily including baking any docker images; That's however is a lot of work ahead
