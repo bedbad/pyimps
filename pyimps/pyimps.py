@@ -314,8 +314,8 @@ def tr2importtr(tree : Node)->None:
                 importlib.import_module(module_name)
                 final[module_name] = 'root'
         except Exception as e:
-                    print(e)
-                    print('sys path:', sys.path)
+                    # print(e)
+                    # print('sys path:', sys.path)
                     final[module_name] = 'absent'
                     # print("module error "+str(e))
     return (tree, final)
@@ -360,28 +360,48 @@ def main():
     parser.add_argument('py_src', type=str, help = 'python source path(with .py) or module name(without .py)')
     args = parser.parse_args()
     verbose = args.verbose
+
+    srcbase_path = os.path.dirname(os.path.realpath(args.py_src))
+    self_path = os.path.dirname(os.path.realpath(__file__))
+    if not Path(self_path).is_relative_to(Path(srcbase_path)):
+        # assert sys.path[0] == self_path
+        sys.path[0] = srcbase_path
+
     if args.search:
         exec_search(args.py_src.split('.')[0])
     if args.py_src.endswith('.py'):
         src = args.py_src
+#we got a module
     else:
-        #we got a module
+        mod_fullname = args.py_src
+        packs = mod_fullname.split('.')
+        mod = packs[-1]
+        package = '.'.join(packs[:-1])
         try:
-            mod2inspect = importlib.import_module(args.py_src)
+            if not package:
+                mod2inspect = importlib.import_module(mod)
+            else:
+                mod2inspect = importlib.import_module('.'+mod, package)
             src = mod2inspect.__file__
             print('Module path: ' + src) 
         except Exception as e:
             print(args.py_src + ' is not found in importable modules')
             print(e)
+            print('SYSPATH:\n', sys.path)
             sys.exit(1)
         
-            
     imports = get_import_trees(src)
     trees = dict2trees(imports)
+    absent = False
     for tree in trees:
         tree, final = tr2importtr(tree)
- 
         print(modtree_render(tree, final, detail=verbose))
+        if 'absent' in final.values():
+            absent = True
+
+    if absent:
+        print('Please check your current syspath contains absent modules\n'+
+                'SYSPATH:{}\n'.format(sys.path))
 
 
 if __name__ == '__main__':
